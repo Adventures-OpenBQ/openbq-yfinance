@@ -39,3 +39,12 @@ See [the complete route map](docs/routes.md). Supported research data includes p
 Our original integration is Apache-2.0. External yfinance and OpenBB V5 dependencies retain their own Apache-2.0 copyright notices; their dependencies retain their respective licenses. `LICENSE` and `NOTICE` are included in distributions. The company notice does not claim ownership of third-party source.
 
 Yahoo Finance is not an official supported API relationship. [yfinance's disclaimer](https://ranaroussi.github.io/yfinance/) describes access as intended for personal research/educational use. This software license does not grant rights to market data or its redistribution. Upstream data availability, history windows and rate limits can change.
+
+## Cookie-cache security
+
+The adapter disables the SDK's persisted cookie cache before every SDK operation,
+so requests do not deserialize cookies from its pickle-backed SQLite cache.
+Cookies remain in SDK memory for the process lifetime; persistent timezone
+caching is unaffected. This SDK switch applies to all yfinance consumers in the
+same process. If a future SDK changes the cookie-cache contract, requests fail
+before calling the SDK until compatibility is reviewed.
