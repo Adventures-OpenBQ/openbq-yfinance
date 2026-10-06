@@ -1,0 +1,75 @@
+<!-- Copyright 2026 SecretoftheUniverse.com LLC. SPDX-License-Identifier: Apache-2.0 -->
+# V5 Yahoo Finance command map
+
+REST prefix: `/api/v1/yfinance/`; Python prefix: `obb.yfinance.`.
+
+| Registered model | Command suffix |
+| --- | --- |
+| YfinanceEquityHistorical | `equity/historical` |
+| YfinanceEtfHistorical | `etf/historical` |
+| YfinanceCryptoHistorical | `crypto/historical` |
+| YfinanceCurrencyHistorical | `currency/historical` |
+| YfinanceIndexHistorical | `index/historical` |
+| YfinanceFuturesHistorical | `futures/historical` |
+| YfinanceEquityQuote | `equity/quote` |
+| YfinanceIncomeStatement | `fundamental/income` |
+| YfinanceBalanceSheet | `fundamental/balance` |
+| YfinanceCashFlowStatement | `fundamental/cash` |
+| YfinanceOptionsChains | `options/chains` |
+| YfinanceProfile | `equity/profile` |
+| YfinanceFastInfo | `equity/fast_info` |
+| YfinanceHistoryMetadata | `equity/history_metadata` |
+| YfinanceIsin | `equity/isin` |
+| YfinanceActions | `corporate_actions/all` |
+| YfinanceDividends | `corporate_actions/dividends` |
+| YfinanceSplits | `corporate_actions/splits` |
+| YfinanceCapitalGains | `corporate_actions/capital_gains` |
+| YfinanceAnalystPriceTargets | `estimates/price_targets` |
+| YfinanceEarningsEstimate | `estimates/earnings` |
+| YfinanceRevenueEstimate | `estimates/revenue` |
+| YfinanceGrowthEstimates | `estimates/growth` |
+| YfinanceEarningsHistory | `estimates/history` |
+| YfinanceEpsTrend | `estimates/eps_trend` |
+| YfinanceEpsRevisions | `estimates/eps_revisions` |
+| YfinanceRecommendations | `estimates/recommendations` |
+| YfinanceRecommendationsSummary | `estimates/recommendations_summary` |
+| YfinanceUpgradesDowngrades | `estimates/upgrades_downgrades` |
+| YfinanceInstitutionalHolders | `ownership/institutional` |
+| YfinanceMutualFundHolders | `ownership/mutual_funds` |
+| YfinanceMajorHolders | `ownership/major` |
+| YfinanceInsiderTransactions | `ownership/insider_transactions` |
+| YfinanceInsiderPurchases | `ownership/insider_purchases` |
+| YfinanceInsiderRoster | `ownership/insider_roster` |
+| YfinanceCompanyCalendar | `calendar/company` |
+| YfinanceCompanyFilings | `equity/filings` |
+| YfinanceSustainability | `equity/sustainability` |
+| YfinanceCompanyNews | `news/company` |
+| YfinanceEarningsDates | `calendar/earnings_dates` |
+| YfinanceShares | `equity/shares` |
+| YfinanceValuation | `fundamental/valuation` |
+| YfinanceExpirations | `options/expirations` |
+| YfinanceSearch | `search/symbols` |
+| YfinanceSearchNews | `search/news` |
+| YfinanceScreener | `screening/predefined` |
+| YfinanceFundDescription | `funds/description` |
+| YfinanceFundFundOverview | `funds/fund_overview` |
+| YfinanceFundFundOperations | `funds/fund_operations` |
+| YfinanceFundAssetClasses | `funds/asset_classes` |
+| YfinanceFundTopHoldings | `funds/top_holdings` |
+| YfinanceFundEquityHoldings | `funds/equity_holdings` |
+| YfinanceFundBondHoldings | `funds/bond_holdings` |
+| YfinanceFundBondRatings | `funds/bond_ratings` |
+| YfinanceFundSectorWeightings | `funds/sector_weightings` |
+| YfinanceSectorOverview | `sector/overview` |
+| YfinanceSectorIndustries | `sector/industries` |
+| YfinanceSectorTopCompanies | `sector/top_companies` |
+| YfinanceSectorTopEtfs | `sector/top_etfs` |
+| YfinanceSectorTopMutualFunds | `sector/top_mutual_funds` |
+| YfinanceSectorResearchReports | `sector/research_reports` |
+| YfinanceIndustryOverview | `industry/overview` |
+| YfinanceIndustryTopCompanies | `industry/top_companies` |
+| YfinanceIndustryTopGrowthCompanies | `industry/top_growth_companies` |
+| YfinanceIndustryTopPerformingCompanies | `industry/top_performing_companies` |
+| YfinanceIndustryResearchReports | `industry/research_reports` |
+| YfinanceMarketSummary | `market/summary` |
+| YfinanceMarketStatus | `market/status` |

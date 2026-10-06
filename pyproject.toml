@@ -1,0 +1,42 @@
+# Copyright 2026 SecretoftheUniverse.com LLC. SPDX-License-Identifier: Apache-2.0
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "openbq-yfinance"
+version = "0.1.0"
+description = "Original Apache-2.0 Yahoo Finance router and provider extensions for OpenBQ"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{name = "SecretoftheUniverse.com LLC"}]
+dependencies = ["openbb-core[pandas]>=2.0.1,<3", "yfinance>=1.7.0,<2"]
+
+[project.urls]
+Repository = "https://github.com/artcashin/openbq-yfinance"
+Issues = "https://github.com/artcashin/openbq-yfinance/issues"
+
+[project.entry-points."openbb_provider_extension"]
+yfinance = "openbq_yfinance:yfinance_provider"
+[project.entry-points."openbb_core_extension"]
+yfinance = "openbq_yfinance.yfinance_router:router"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff==0.15.22", "build", "openbb-platform-api==2.0.1", "httpx"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["openbq_yfinance"]
+[tool.hatch.build.targets.sdist]
+include = ["openbq_yfinance", "tests", "docs", "README.md", "LICENSE", "NOTICE", "pyproject.toml", "uv.lock", "VERIFICATION.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

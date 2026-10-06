@@ -1,0 +1,15 @@
+# Local environments and generated artifacts
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.DS_Store
+.env
+.env.*
+!.env.example
+*.env
+!*.env.example
