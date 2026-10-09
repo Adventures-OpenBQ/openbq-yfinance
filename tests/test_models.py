@@ -70,6 +70,27 @@ def test_normalization_is_json_safe_and_does_not_mutate_payload():
     assert 'regularMarketPrice' in payload
 
 
+def test_history_metadata_mapping_is_normalized():
+    import json
+    from yfinance.scrapers.history import HistoryMetadata
+    from openbq_yfinance.records import records
+    history = type('History', (), {'_history_metadata': {'currency': 'USD', 'tradingPeriods': []}})()
+    rows = records(HistoryMetadata(history))
+    assert rows[0]['currency'] == 'USD'
+    json.dumps(rows)
+
+
+def test_market_status_timezone_is_json_safe():
+    import json
+    from datetime import datetime, timedelta, timezone
+    from openbq_yfinance.records import records
+    edt = timezone(timedelta(hours=-4), 'EDT')
+    rows = records({'id': 'us', 'open': datetime(2026, 1, 2, 9, 30, tzinfo=edt), 'tz': edt})
+    assert rows[0]['tz'] == 'EDT'
+    json.dumps(rows)
+
+
+
 def test_empty_history_reports_empty_data():
     from openbq_yfinance.models.prices import HistoricalFetcher
     from openbb_core.provider.utils.errors import EmptyDataError

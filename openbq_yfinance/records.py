@@ -1,5 +1,6 @@
 # Copyright 2026 SecretoftheUniverse.com LLC. SPDX-License-Identifier: Apache-2.0
 """Normalize public SDK payloads to independent, JSON-safe vendor records."""
+from collections.abc import Mapping
 from datetime import date, datetime
 import math
 import re
@@ -16,7 +17,7 @@ def snake(value: Any) -> str:
 def clean(value: Any) -> Any:
     if isinstance(value, (pd.DataFrame, pd.Series)):
         return records(value)
-    if isinstance(value, dict):
+    if isinstance(value, Mapping):
         return {snake(k): clean(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [clean(v) for v in value]
@@ -28,7 +29,7 @@ def clean(value: Any) -> Any:
         return clean(value.item())
     if isinstance(value, float) and not math.isfinite(value):
         return None
-    return value
+    return value if isinstance(value, (str, int, float, bool)) else str(value)
 
 
 def records(payload: Any) -> list[dict]:
@@ -49,7 +50,7 @@ def records(payload: Any) -> list[dict]:
         return [clean(row) for row in frame.to_dict(orient='records')]
     if isinstance(payload, pd.Series):
         return [{'index': clean(k), 'value': clean(v)} for k, v in payload.items()]
-    if isinstance(payload, dict):
+    if isinstance(payload, Mapping):
         return [clean(payload)] if payload else []
     if isinstance(payload, (list, tuple)):
         return [clean(v) if isinstance(v, dict) else {'value': clean(v)} for v in payload]
