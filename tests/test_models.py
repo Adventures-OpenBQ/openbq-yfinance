@@ -80,6 +80,14 @@ def test_history_metadata_mapping_is_normalized():
     json.dumps(rows)
 
 
+def test_list_of_mappings_is_normalized():
+    from yfinance.scrapers.history import HistoryMetadata
+    from openbq_yfinance.records import records
+    history = type('History', (), {'_history_metadata': {'currency': 'USD', 'exchangeName': 'NMS', 'tradingPeriods': []}})()
+    rows = records([HistoryMetadata(history)])
+    assert rows == [{'currency': 'USD', 'exchange_name': 'NMS', 'trading_periods': []}]
+
+
 def test_market_status_timezone_is_json_safe():
     import json
     from datetime import datetime, timedelta, timezone

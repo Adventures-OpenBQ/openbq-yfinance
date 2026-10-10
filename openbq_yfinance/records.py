@@ -53,5 +53,5 @@ def records(payload: Any) -> list[dict]:
     if isinstance(payload, Mapping):
         return [clean(payload)] if payload else []
     if isinstance(payload, (list, tuple)):
-        return [clean(v) if isinstance(v, dict) else {'value': clean(v)} for v in payload]
+        return [clean(v) if isinstance(v, Mapping) else {'value': clean(v)} for v in payload]
     return [{'value': clean(payload)}]
