@@ -347,3 +347,16 @@ def test_account_mismatch_never_fetches_or_uses_unbound_stale():
     with pytest.raises(module.NoCapturedValue):
         shared.readthrough('YfinanceEquityHistorical',{'symbol':'TEST'},lambda:calls.append('SDK'))
     assert calls==[]
+
+
+def test_configured_account_is_asserted_before_acquisition():
+    from openbq_yfinance.capture import HttpCaptureBridge
+    value=HttpCaptureBridge('http://localhost','fixture',str(uuid4()),'paid','alice')
+    value.account_id='trusted'
+    calls=[]
+    def call(method,**kwargs):
+        calls.append(kwargs)
+        return dict(state='owner',acquisition_id=str(uuid4()),account='trusted')
+    value._call=call
+    value.acquire('value',{})
+    assert calls[0]['metadata']['expected_account']=='trusted'
