@@ -21,6 +21,7 @@ from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, HTTPRedirectHandler, build_opener
 from uuid import UUID, uuid4
 
+import numpy as np
 import pandas as pd
 from openbb_core.provider.abstract.annotated_result import AnnotatedResult
 
@@ -167,6 +168,8 @@ class HttpCaptureBridge:
                 received_at=previous["received_at"],
                 representation="sdk_decoded_v1",
             )
+        except CapabilityUnavailable:
+            raise
         except Exception:
             raise NoCapturedValue(
                 "NO_CAPTURED_VALUE: no acknowledged Yahoo operation result"
@@ -208,7 +211,10 @@ def pack(value):
             "frame",
             pack_axis(value.index),
             pack_axis(value.columns),
-            [[pack(v) for v in row] for row in value.to_numpy().tolist()],
+            [
+                [pack(value.iat[row, column]) for column in range(value.shape[1])]
+                for row in range(value.shape[0])
+            ],
         ]
     if isinstance(value, pd.Series):
         return [
@@ -227,8 +233,11 @@ def pack(value):
         return ["tuple", [pack(v) for v in value]]
     if isinstance(value, list):
         return ["list", [pack(v) for v in value]]
-    if hasattr(value, "item"):
-        return pack(value.item())
+    if isinstance(value, np.generic):
+        scalar = value.item()
+        if isinstance(scalar, np.generic):
+            raise CapabilityUnavailable("SDK scalar has no exact supported JSON representation")
+        return pack(scalar)
     if isinstance(value, bool):
         return ["bool", value]
     if isinstance(value, int):
@@ -258,8 +267,12 @@ def pack_axis(axis):
 def unpack_axis(value):
     kind = value[0]
     if kind == "multi":
-        return pd.MultiIndex.from_tuples(
-            [unpack(v) for v in value[1]], names=[unpack(v) for v in value[2]]
+        tuples = [unpack(v) for v in value[1]]
+        names = [unpack(v) for v in value[2]]
+        # Object axes keep mixed numeric labels exact during factorization.
+        return pd.MultiIndex.from_arrays(
+            [pd.Index([row[level] for row in tuples], dtype=object) for level in range(len(names))],
+            names=names,
         )
     if kind == "datetime":
         points = [unpack(v) for v in value[1]]
@@ -271,7 +284,9 @@ def unpack_axis(value):
     if kind == "range":
         return pd.RangeIndex(value[1], value[2], value[3], name=unpack(value[4]))
     if kind == "index":
-        return pd.Index([unpack(v) for v in value[1]], name=unpack(value[2]), tupleize_cols=False)
+        return pd.Index(
+            [unpack(v) for v in value[1]], name=unpack(value[2]), tupleize_cols=False, dtype=object
+        )
     raise CapabilityUnavailable("unsupported decoded axis")
 
 
@@ -284,10 +299,14 @@ def unpack(value):
             [[unpack(v) for v in row] for row in value[3]],
             index=unpack_axis(value[1]),
             columns=unpack_axis(value[2]),
+            dtype=object,
         )
     if kind == "series":
         return pd.Series(
-            [unpack(v) for v in value[3]], index=unpack_axis(value[1]), name=unpack(value[2])
+            [unpack(v) for v in value[3]],
+            index=unpack_axis(value[1]),
+            name=unpack(value[2]),
+            dtype=object,
         )
     if kind == "timestamp":
         return pd.Timestamp(value[1])
@@ -304,18 +323,32 @@ def unpack(value):
 
 
 def encode(value):
-    return json.dumps(
-        {"version": 1, "representation": "sdk_decoded_v1", "value": pack(value)},
-        allow_nan=False,
-        separators=(",", ":"),
-    ).encode()
+    try:
+        return json.dumps(
+            {"version": 1, "representation": "sdk_decoded_v1", "value": pack(value)},
+            allow_nan=False,
+            separators=(",", ":"),
+        ).encode()
+    except CapabilityUnavailable:
+        raise
+    except Exception:
+        raise CapabilityUnavailable(
+            "SDK output conversion cannot meet decoded representation"
+        ) from None
 
 
 def decode(body):
-    value = json.loads(body)
-    if value.get("version") != 1 or value.get("representation") != "sdk_decoded_v1":
-        raise CapabilityUnavailable("unsupported SDK decoded payload version")
-    return unpack(value["value"])
+    try:
+        value = json.loads(body)
+        if value.get("version") != 1 or value.get("representation") != "sdk_decoded_v1":
+            raise CapabilityUnavailable("unsupported SDK decoded payload version")
+        return unpack(value["value"])
+    except CapabilityUnavailable:
+        raise
+    except Exception:
+        raise CapabilityUnavailable(
+            "retained SDK output cannot meet decoded representation"
+        ) from None
 
 
 def captured_call(operation, bridge):

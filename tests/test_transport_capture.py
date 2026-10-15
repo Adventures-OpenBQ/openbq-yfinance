@@ -206,3 +206,110 @@ def test_domain_identity_is_reviewed_and_does_not_use_secret_key_field(monkeypat
     result = asyncio.run(model.fetch_data({"key": "technology", "region": "US"}))
     assert result.result[0].data["name"] == "Technology"
     assert shared.events[0][0]["request"] == {"domain_key": "technology", "region": "US"}
+
+
+@pytest.mark.parametrize(
+    "kind", ["mixed_columns", "mixed_cells", "nullable_frame", "nullable_series"]
+)
+def test_decoded_numeric_values_remain_exact_in_retained_payload_and_reconstruction(kind):
+    module = implementation()
+    large = 9007199254740993
+    if kind == "mixed_columns":
+        source = pd.DataFrame({"shares": [large], "price": [1.25]})
+    elif kind == "mixed_cells":
+        source = pd.DataFrame({"shares": pd.Series([large, 1.25, None], dtype=object)})
+    elif kind == "nullable_frame":
+        source = pd.DataFrame({"shares": pd.Series([large, None], dtype="Int64")})
+    else:
+        source = pd.Series([large, None], dtype="Int64", name="shares")
+    body = module.encode(source)
+    packed = json.loads(body)["value"]
+    # Durable evidence must retain the integer before any reconstruction occurs.
+    cell = packed[3][0][0] if isinstance(source, pd.DataFrame) else packed[3][0]
+    assert cell == ["int", 9007199254740993]
+    restored = module.decode(body)
+    values = restored["shares"] if isinstance(restored, pd.DataFrame) else restored
+    assert values.iloc[0] == 9007199254740993
+    assert isinstance(values.iloc[0], int)
+    if kind == "mixed_columns":
+        assert restored["price"].iloc[0] == 1.25
+    elif kind == "mixed_cells":
+        assert values.iloc[1] == 1.25 and values.iloc[2] is None
+    else:
+        assert values.iloc[1] is None
+
+
+@pytest.mark.parametrize("has_previous", [False, True])
+def test_unrepresentable_ndarray_is_capability_failure_without_fallback(has_previous):
+    import numpy as np
+
+    module = implementation()
+    shared = bridge(module)
+    if has_previous:
+        shared.readthrough(
+            "YfinanceProfile", {"symbol": "TEST"}, lambda: module.encode({"name": "prior"})
+        )
+    before = len(shared.events)
+    with pytest.raises(module.CapabilityUnavailable):
+        shared.readthrough(
+            "YfinanceProfile",
+            {"symbol": "TEST"},
+            lambda: module.encode({"validRanges": np.array(["1d", "5d"])}),
+        )
+    assert len(shared.events) == before
+
+
+@pytest.mark.parametrize("has_previous", [False, True])
+def test_codec_conversion_failure_is_capability_failure_without_fallback(has_previous):
+    module = implementation()
+    shared = bridge(module)
+    if has_previous:
+        shared.readthrough(
+            "YfinanceProfile", {"symbol": "TEST"}, lambda: module.encode({"name": "prior"})
+        )
+    # A supported datetime subclass can fail during its representation conversion.
+    from datetime import datetime
+
+    class FailingTimestamp(datetime):
+        def isoformat(self, *args, **kwargs):
+            raise ValueError("fixture conversion failed")
+
+    with pytest.raises(module.CapabilityUnavailable):
+        shared.readthrough(
+            "YfinanceProfile",
+            {"symbol": "TEST"},
+            lambda: module.encode(FailingTimestamp(2026, 1, 2)),
+        )
+
+
+@pytest.mark.parametrize("multi", [False, True])
+def test_decoded_numeric_axis_labels_remain_exact(multi):
+    module = implementation()
+    axis = pd.Index([9007199254740993, 1.25], dtype=object)
+    if multi:
+        axis = pd.MultiIndex(levels=[axis], codes=[[0, 1]], names=["number"])
+    source = pd.DataFrame({"value": [1, 2]}, index=axis)
+    restored = module.decode(module.encode(source))
+    expected = [(9007199254740993,), (1.25,)] if multi else [9007199254740993, 1.25]
+    assert list(restored.index) == expected
+    first = restored.index[0][0] if multi else restored.index[0]
+    assert isinstance(first, int)
+
+
+@pytest.mark.parametrize("has_previous", [False, True])
+def test_decode_conversion_failure_cannot_enter_generic_fallback(has_previous):
+    module = implementation()
+    shared = bridge(module)
+    if has_previous:
+        shared.readthrough(
+            "YfinanceProfile", {"symbol": "TEST"}, lambda: module.encode({"name": "prior"})
+        )
+    invalid = json.dumps(
+        {
+            "version": 1,
+            "representation": "sdk_decoded_v1",
+            "value": ["timestamp", "invalid-timestamp"],
+        }
+    ).encode()
+    with pytest.raises(module.CapabilityUnavailable):
+        shared.readthrough("YfinanceProfile", {"symbol": "TEST"}, lambda: invalid)
