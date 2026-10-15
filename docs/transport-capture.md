@@ -1,0 +1,11 @@
+# Audited decoded capture
+
+Set `YFINANCE_CAPTURE_REQUIRED=1` and configure `YFINANCE_CAPTURE_URL`, `YFINANCE_CAPTURE_TOKEN`, `YFINANCE_CAPTURE_WORKSPACE_ID`, `YFINANCE_CAPTURE_ENTITLEMENT` and `YFINANCE_CAPTURE_PRINCIPAL`. The TemporalDB server authenticates scope from token policy. Non-loopback internal HTTP requires `YFINANCE_CAPTURE_TRUST_INTERNAL_HTTP=1`.
+
+Every service data model is enumerated in `openbq_yfinance/endpoint_manifest.json` with a reviewed scalar request schema and existing OpenBB normalizer. A versioned `sdk_decoded_v1` typed JSON tree is durably retained before output projection. The capture unit is the extension operation result, which can contain several symbols or nested SDK work. Source HTTP bodies, individual hidden responses and retry attempts are not available at this boundary. `YFINANCE_CAPTURE_CAPABILITY` defaults to `sdk_decoded_v1`; requests for `http_body`, `nested_http_responses` or other unsupported evidence fail before acquisition. No SDK session or singleton is replaced.
+
+The representation preserves mapping keys, arrays, tuple labels, frame/series axes, timestamps and timezones. Numeric missing/infinite cells become null. It does not claim Python object identity or pandas runtime dtype fidelity. Unrepresentable output fails capability validation. Retained bytes are decoded for both fresh and stale output; an unacknowledged live object cannot escape. SDK-internal failure attempts have no decoded result to retain.
+
+Receipts survive the actual Python and REST OpenBB projections in `OBBject.extra.results_metadata.temporaldb`, including aggregate stale state and explicit representation/capability limits. Only local acquisition knowledge is supported. Provider publication history and complete correction history are unknown. Capturing individual Yahoo HTTP responses would require separately isolated acquisition workers.
+
+Standalone operation remains available when audited capture is disabled. All tests use local fixtures; no live Yahoo acquisition is used for verification.
