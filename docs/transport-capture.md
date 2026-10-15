@@ -9,3 +9,10 @@ The representation preserves mapping keys, JSON sequences, tuple labels, frame/s
 Receipts survive the actual Python and REST OpenBB projections in `OBBject.extra.results_metadata.temporaldb`, including aggregate stale state and explicit representation/capability limits. Only local acquisition knowledge is supported. Provider publication history and complete correction history are unknown. Capturing individual Yahoo HTTP responses would require separately isolated acquisition workers.
 
 Standalone operation remains available when audited capture is disabled. All tests use local fixtures; no live Yahoo acquisition is used for verification.
+
+Managed v11 hosts set `YFINANCE_CAPTURE_ACCOUNT` to the explicit public Yahoo
+account ID assigned in TemporalDB's private token policy. Acquisition and stale
+fallback must return that same server-resolved account. The public SDK path
+rejects Yahoo/yfinance credential, cookie, session or proxy credential overrides
+before invoking the SDK. The account ID is an opaque policy label, not a claim of
+HTTP request capture or paid Yahoo entitlement.

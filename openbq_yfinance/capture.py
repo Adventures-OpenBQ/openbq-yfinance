@@ -57,7 +57,7 @@ class _NoRedirect(HTTPRedirectHandler):
 
 class HttpCaptureBridge:
     def __init__(
-        self, url, token, workspace_id, entitlement, principal, *, trusted_internal_http=False
+        self, url, token, workspace_id, entitlement, principal, *, trusted_internal_http=False, account_id=None
     ):
         parsed = urlsplit(url)
         if (
@@ -83,6 +83,7 @@ class HttpCaptureBridge:
         self.url, self._token = url.rstrip("/"), token
         self.scope = (workspace_id, entitlement, principal)
         self.entitlement = entitlement
+        self.account_id = account_id
 
     def cache_scope(self):
         # Scope and credential-policy identity; no credential leaves the process.
@@ -124,6 +125,8 @@ class HttpCaptureBridge:
         while True:
             result = self._call('POST', metadata=metadata, body=b'', query='?acquire=1')
             UUID(result['acquisition_id'])
+            if self.account_id is not None and result.get('account') != self.account_id:
+                raise CaptureUnavailable('server provider account differs from configured host account')
             if result['state'] in {'owner','complete'}:
                 return result
             if result['state'] != 'pending' or time.monotonic() >= deadline:
@@ -186,6 +189,8 @@ class HttpCaptureBridge:
             previous = self._call(
                 "GET", query="?" + urlencode({"request_key": self.request_key(endpoint, request)})
             )
+            if self.account_id is not None and previous.get('account') != self.account_id:
+                raise CaptureUnavailable('stale response belongs to another provider account')
             value = decode(base64.b64decode(previous["body_base64"], validate=True))
             return value, dict(
                 capture_id=str(UUID(previous["capture_id"])),
@@ -218,6 +223,7 @@ def configured_bridge():
                 )
             ),
             trusted_internal_http=os.getenv("YFINANCE_CAPTURE_TRUST_INTERNAL_HTTP") == "1",
+            account_id=os.environ["YFINANCE_CAPTURE_ACCOUNT"],
         )
     except KeyError:
         raise CaptureUnavailable("required shared Yahoo capture bridge is not configured") from None
@@ -399,6 +405,8 @@ def instrument_provider(provider):
             bridge = configured_bridge()
             if bridge is None:
                 return await _original(params, credentials, **kwargs)
+            if any(key.lower().startswith(('yahoo','yfinance')) or key.lower() in {'cookie','session','proxy'} for key in (credentials or {})):
+                raise CaptureUnavailable('managed public Yahoo account rejects credential overrides')
             if _entry["mode"] == "unsupported":
                 raise CapabilityUnavailable(_entry["reason"])
             query = cls.transform_query(params)

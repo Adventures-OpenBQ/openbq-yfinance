@@ -326,3 +326,24 @@ def test_sdk_timing_and_adapter_do_not_invent_http_headers():
     assert metadata['request_duration_ms'] >= 0
     assert metadata['adapter_version'] == 'openbq-yfinance-capture:2'
     assert metadata['response_headers'] is None
+
+
+def test_managed_public_account_rejects_overrides_before_sdk(monkeypatch):
+    module=implementation()
+    from openbq_yfinance import yfinance_provider
+    shared=bridge(module)
+    monkeypatch.setattr(module,'configured_bridge',lambda:shared)
+    fetcher=yfinance_provider.fetcher_dict['YfinanceEquityHistorical']
+    with pytest.raises(module.CaptureUnavailable,match='credential overrides'):
+        asyncio.run(fetcher.fetch_data({'symbol':'TEST'}, {'yfinance_cookie':'foreign-account'}))
+    assert shared.events==[]
+
+
+def test_account_mismatch_never_fetches_or_uses_unbound_stale():
+    module=implementation()
+    shared=bridge(module)
+    shared.account_id='public-account-a'
+    calls=[]
+    with pytest.raises(module.NoCapturedValue):
+        shared.readthrough('YfinanceEquityHistorical',{'symbol':'TEST'},lambda:calls.append('SDK'))
+    assert calls==[]
