@@ -1,6 +1,7 @@
 # Copyright 2026 SecretoftheUniverse.com LLC. SPDX-License-Identifier: Apache-2.0
 """Original public-yfinance integration for the OpenBB V5 extension runtime."""
 from openbb_core.provider.abstract.provider import Provider
+from openbq_yfinance.capture import configured_bridge as _configured_bridge, instrument_provider as _instrument_provider
 from openbq_yfinance.models.prices import HistoricalFetcher, QuoteFetcher
 from openbq_yfinance.models.statements import IncomeFetcher, BalanceFetcher, CashFetcher
 from openbq_yfinance.models.options import ChainsFetcher
@@ -26,3 +27,6 @@ yfinance_provider = Provider(
         **RESOURCE_FETCHERS,
     },
 )
+
+_configured_bridge()
+_instrument_provider(yfinance_provider)
