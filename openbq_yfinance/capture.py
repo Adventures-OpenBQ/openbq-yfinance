@@ -17,6 +17,7 @@ from importlib.resources import files
 import json
 import math
 import os
+import time
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, HTTPRedirectHandler, build_opener
 from uuid import UUID, uuid4
@@ -117,6 +118,19 @@ class HttpCaptureBridge:
             ).encode()
         ).hexdigest()
 
+    def acquire(self, endpoint, request):
+        metadata = dict(provider='yfinance', endpoint=endpoint, request=request, operation_id=str(uuid4()))
+        deadline = time.monotonic() + 60
+        while True:
+            result = self._call('POST', metadata=metadata, body=b'', query='?acquire=1')
+            UUID(result['acquisition_id'])
+            if result['state'] in {'owner','complete'}:
+                return result
+            if result['state'] != 'pending' or time.monotonic() >= deadline:
+                raise CaptureUnavailable('shared acquisition unavailable')
+            metadata['wait_for'] = result['acquisition_id']
+            time.sleep(0.05)
+
     def retain(self, metadata, body):
         digest = sha256(body).hexdigest()
         for attempt in range(2):
@@ -135,16 +149,27 @@ class HttpCaptureBridge:
 
     def readthrough(self, endpoint, request, fetch):
         try:
+            acquisition = self.acquire(endpoint, request)
+            if acquisition['state']=='complete':
+                body = base64.b64decode(acquisition['body_base64'],validate=True)
+                return decode(body),dict(capture_id=acquisition['capture_id'],stale=False,received_at=acquisition['received_at'],representation='sdk_decoded_v1')
+            started = datetime.now(timezone.utc).isoformat()
+            clock = time.monotonic()
             body = fetch()
             received_at = datetime.now(timezone.utc).isoformat()
             metadata = dict(
-                capture_id=str(uuid4()),
+                capture_id=acquisition['acquisition_id'],
+                acquisition_id=acquisition['acquisition_id'],
                 provider="yfinance",
                 endpoint=endpoint,
                 request=request,
                 http_status=200,
                 received_at=received_at,
                 representation="sdk_decoded_v1",
+                request_started_at=started,
+                request_duration_ms=(time.monotonic() - clock) * 1000,
+                adapter_version="openbq-yfinance-capture:2",
+                response_headers=None,
             )
             ack = self.retain(metadata, body)
             return decode(body), dict(

@@ -22,6 +22,8 @@ def bridge(module):
     value.events, value.previous, value.fail = [], None, False
 
     def call(method, *, metadata=None, body=None, query=""):
+        if query == '?acquire=1':
+            return {'state':'owner','acquisition_id':str(uuid4())}
         import base64
 
         if method == "GET":
@@ -313,3 +315,14 @@ def test_decode_conversion_failure_cannot_enter_generic_fallback(has_previous):
     ).encode()
     with pytest.raises(module.CapabilityUnavailable):
         shared.readthrough("YfinanceProfile", {"symbol": "TEST"}, lambda: invalid)
+
+
+def test_sdk_timing_and_adapter_do_not_invent_http_headers():
+    module = implementation()
+    shared = bridge(module)
+    shared.readthrough('YfinanceProfile', {'symbol':'TEST'}, lambda: module.encode({'value':1}))
+    metadata = shared.events[0][0]
+    assert metadata['request_started_at'] <= metadata['received_at']
+    assert metadata['request_duration_ms'] >= 0
+    assert metadata['adapter_version'] == 'openbq-yfinance-capture:2'
+    assert metadata['response_headers'] is None
