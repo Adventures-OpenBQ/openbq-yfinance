@@ -1,6 +1,6 @@
 # Copyright 2026 SecretoftheUniverse.com LLC. SPDX-License-Identifier: Apache-2.0
 """Typed history and quote adapters written against yfinance's public API."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 from openbb_core.provider.abstract.fetcher import Fetcher
 from openbb_core.provider.standard_models.equity_historical import EquityHistoricalData, EquityHistoricalQueryParams
@@ -30,8 +30,8 @@ class HistoricalQuery(EquityHistoricalQueryParams):
 
     @model_validator(mode='after')
     def dates_in_order(self):
-        if self.start_date and self.end_date and self.start_date >= self.end_date:
-            raise ValueError('start_date must precede the exclusive end_date.')
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValueError('start_date must not be after end_date.')
         return self
 
 
@@ -54,7 +54,8 @@ class HistoricalFetcher(Fetcher[HistoricalQuery, list[HistoricalData]]):
             for symbol in query.symbol.split(','):
                 options = dict(interval=query.interval, auto_adjust=query.auto_adjust, prepost=query.prepost, repair=query.repair, timeout=query.timeout, raise_errors=True)
                 if query.start_date or query.end_date:
-                    options.update(start=query.start_date, end=query.end_date)
+                    # yfinance's end is exclusive; OpenBB's end_date is inclusive.
+                    options.update(start=query.start_date, end=query.end_date and query.end_date + timedelta(days=1))
                 else:
                     options['period'] = query.period
                 result[symbol] = ticker(symbol).history(**options)
@@ -67,7 +68,8 @@ class HistoricalFetcher(Fetcher[HistoricalQuery, list[HistoricalData]]):
         for symbol, frame in data.items():
             for stamp, item in frame.iterrows():
                 row = {k: clean(item.get(v)) for k, v in {'open':'Open','high':'High','low':'Low','close':'Close','volume':'Volume','adjusted_close':'Adj Close'}.items()}
-                row.update(symbol=symbol, date=stamp.to_pydatetime())
+                # Daily-and-up bars are exchange-local midnight; send the calendar date so no client shifts the day.
+                row.update(symbol=symbol, date=stamp.date() if query.interval in ('1d','5d','1wk','1mo','3mo') else stamp.to_pydatetime())
                 rows.append(HistoricalData(**row))
         if not rows:
             raise EmptyDataError('Yahoo Finance returned no historical prices.')

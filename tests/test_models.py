@@ -205,6 +205,14 @@ def test_history_passes_dates_and_adjustment_to_sdk(monkeypatch):
     assert 'period' not in seen[0]
     assert seen[0]['timeout'] == 15
     assert result[0].adjusted_close is None
+    assert str(seen[0]['end']) == '2026-01-04'  # end_date is inclusive; yfinance's end is exclusive
+    assert result[0].date == date(2026, 1, 2)  # a daily bar is a calendar date, not a midnight instant
+
+
+def test_one_day_range_is_allowed():
+    from openbq_yfinance.models.prices import HistoricalFetcher
+    query = HistoricalFetcher.transform_query({'symbol': 'AAPL', 'start_date': '2026-01-02', 'end_date': '2026-01-02'})
+    assert query.start_date == query.end_date
 
 
 def test_options_choose_nearest_available_expiration(monkeypatch):

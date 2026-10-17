@@ -45,7 +45,7 @@ def test_python_and_rest_history_use_real_sdk_boundary(monkeypatch):
     assert response.json()['results'][0]['adjusted_close'] == 10.5
     assert [item[0] for item in seen] == ['AAPL','MSFT']
     assert seen[0][1]['period'] == '1y'
-    assert seen[1][1]['end'].isoformat() == '2026-01-03'
+    assert seen[1][1]['end'].isoformat() == '2026-01-04'  # inclusive end_date + 1 for yfinance
     assert seen[0][1]['raise_errors'] is True
     schema = client.get('/openapi.json').json()
     assert schema['info']['license']['name'] == 'Apache-2.0'
