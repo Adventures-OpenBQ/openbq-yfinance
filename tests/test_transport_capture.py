@@ -1,6 +1,7 @@
 """Decoded capture is explicit; wire/nested HTTP evidence is never invented."""
 
 import asyncio
+import datetime
 from hashlib import sha256
 import importlib
 import json
@@ -70,7 +71,8 @@ def test_decoded_prices_capture_precedes_projection_and_stale_survives_openbb(mo
     fetcher = yfinance_provider.fetcher_dict["YfinanceEquityHistorical"]
     result = asyncio.run(fetcher.fetch_data({"symbol": "TEST"}))
     assert result.result[0].close == 12
-    assert result.result[0].date.utcoffset().total_seconds() == -18000
+    # Daily bars carry the calendar date (11ea134), not the exchange-local timestamp.
+    assert result.result[0].date == datetime.date(2026, 1, 2)
     meta, body = shared.events[0]
     assert meta["representation"] == "sdk_decoded_v1"
     assert json.loads(body)["version"] == 1
