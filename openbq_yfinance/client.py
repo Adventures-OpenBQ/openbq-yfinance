@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 from openbb_core.app.model.abstract.error import OpenBBError
 from openbb_core.provider.utils.errors import EmptyDataError
+from openbq_yfinance.capture import CaptureUnavailable
 
 
 def _disable_cookie_cache() -> None:
@@ -24,8 +25,12 @@ async def call(operation: Callable[[], Any]) -> Any:
     """Run one SDK operation; retain an actionable upstream error and its cause."""
     try:
         _disable_cookie_cache()
+        from openbq_yfinance import capture
+        bridge = capture.configured_bridge()
+        if bridge is not None:
+            return await asyncio.to_thread(capture.captured_call, operation, bridge)
         return await asyncio.to_thread(operation)
-    except (OpenBBError, EmptyDataError):
+    except (OpenBBError, EmptyDataError, CaptureUnavailable):
         raise
     except Exception as exc:
         raise OpenBBError(f"Yahoo Finance request failed: {exc}") from exc
