@@ -16,6 +16,7 @@ REST prefix: `/api/v1/yfinance/`; Python prefix: `obb.yfinance.`.
 | YfinanceBalanceSheet | `fundamental/balance` |
 | YfinanceCashFlowStatement | `fundamental/cash` |
 | YfinanceOptionsChains | `options/chains` |
+| YfinanceOptionsChainsLong | `options/chains_long` |
 | YfinanceProfile | `equity/profile` |
 | YfinanceFastInfo | `equity/fast_info` |
 | YfinanceHistoryMetadata | `equity/history_metadata` |
