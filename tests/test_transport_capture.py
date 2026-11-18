@@ -362,3 +362,30 @@ def test_configured_account_is_asserted_before_acquisition():
     value._call=call
     value.acquire('value',{})
     assert calls[0]['metadata']['expected_account']=='trusted'
+
+
+def test_long_chain_decodes_from_retained_payload(monkeypatch):
+    from types import SimpleNamespace
+    module = implementation()
+    from openbq_yfinance import yfinance_provider
+    from openbq_yfinance.models import options
+
+    shared = bridge(module)
+    monkeypatch.setattr(module, "configured_bridge", lambda: shared)
+
+    class Asset:
+        options = ("2026-11-20", "2026-12-18")
+
+        def option_chain(self, expiration):
+            frame = pd.DataFrame([{"contractSymbol": "C" + expiration, "strike": 100, "impliedVolatility": 0.25}])
+            quote = {"regularMarketPrice": 100.5, "regularMarketTime": 1794963600, "exchangeTimezoneName": "America/New_York"}
+            return SimpleNamespace(calls=frame, puts=frame.iloc[:0], underlying=quote)
+
+    monkeypatch.setattr(options, "ticker", lambda symbol: Asset())
+    result = asyncio.run(
+        yfinance_provider.fetcher_dict["YfinanceOptionsChainsLong"].fetch_data({"symbol": "TEST"})
+    )
+    assert [(row.expiration.isoformat(), row.dte) for row in result.result] == [("2026-11-20", 3), ("2026-12-18", 31)]
+    assert result.result[0].underlying_price == 100.5 and result.result[0].implied_volatility == 0.25
+    assert shared.events[0][0]["request"] == {"symbol": "TEST"}
+    assert shared.events[0][0]["representation"] == "sdk_decoded_v1"

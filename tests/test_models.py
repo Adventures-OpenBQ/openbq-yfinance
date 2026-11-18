@@ -237,3 +237,38 @@ def test_news_count_reaches_public_sdk(monkeypatch):
     monkeypatch.setattr(resources, 'ticker', lambda symbol: Asset())
     rows = asyncio.run(resources.RESOURCE_FETCHERS['YfinanceCompanyNews'].fetch_data({'symbol':'MSFT','count':3,'tab':'all'}))
     assert rows[0].data['title'] == 'Headline'
+
+
+def test_long_chain_serves_every_expiry_with_underlying_and_dte(monkeypatch):
+    from types import SimpleNamespace
+    from openbq_yfinance.models import options
+    # 2026-11-18 01:00 UTC is still 2026-11-17 in New York: eod_date follows the exchange.
+    quotes = iter([{'regularMarketPrice': 100.5, 'regularMarketTime': 1794963600, 'exchangeTimezoneName': 'America/New_York'},
+                   {'regularMarketPrice': 999., 'regularMarketTime': 1794963600, 'exchangeTimezoneName': 'America/New_York'}])
+    class Asset:
+        options = ('2026-11-20', '2026-12-18')
+        def option_chain(self, expiration):
+            call = pd.DataFrame([{'contractSymbol': 'C' + expiration, 'strike': 100, 'impliedVolatility': .25, 'percentChange': 2}])
+            return SimpleNamespace(calls=call, puts=call.assign(contractSymbol='P' + expiration), underlying=next(quotes))
+    monkeypatch.setattr(options, 'ticker', lambda symbol: Asset())
+    rows = asyncio.run(options.LongChainsFetcher.fetch_data({'symbol': 'aapl'}))
+    assert [(row.expiration, row.option_type) for row in rows] == [
+        (date(2026, 11, 20), 'call'), (date(2026, 11, 20), 'put'), (date(2026, 12, 18), 'call'), (date(2026, 12, 18), 'put')]
+    assert {row.underlying_symbol for row in rows} == {'AAPL'}
+    assert {row.eod_date for row in rows} == {date(2026, 11, 17)}
+    assert {row.underlying_price for row in rows} == {100.5}  # one spot for the whole response
+    assert [row.dte for row in rows] == [3, 3, 31, 31]
+    assert rows[0].implied_volatility == .25  # Yahoo's decimal fraction, passed through
+    assert rows[0].change_percent == .02
+
+
+def test_long_chain_without_underlying_quote_leaves_derived_fields_null(monkeypatch):
+    from types import SimpleNamespace
+    from openbq_yfinance.models import options
+    class Asset:
+        options = ('2026-11-20',)
+        def option_chain(self, expiration):
+            return SimpleNamespace(calls=pd.DataFrame([{'contractSymbol': 'C', 'strike': 100}]), puts=pd.DataFrame(), underlying={})
+    monkeypatch.setattr(options, 'ticker', lambda symbol: Asset())
+    row = asyncio.run(options.LongChainsFetcher.fetch_data({'symbol': 'AAPL'}))[0]
+    assert (row.underlying_price, row.eod_date, row.dte) == (None, None, None)
