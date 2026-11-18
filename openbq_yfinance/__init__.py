@@ -3,7 +3,7 @@
 from openbb_core.provider.abstract.provider import Provider
 from openbq_yfinance.models.prices import HistoricalFetcher, QuoteFetcher
 from openbq_yfinance.models.statements import IncomeFetcher, BalanceFetcher, CashFetcher
-from openbq_yfinance.models.options import ChainsFetcher
+from openbq_yfinance.models.options import ChainsFetcher, LongChainsFetcher
 from openbq_yfinance.models.resources import RESOURCE_FETCHERS
 
 yfinance_provider = Provider(
@@ -23,6 +23,7 @@ yfinance_provider = Provider(
         'YfinanceBalanceSheet': BalanceFetcher,
         'YfinanceCashFlowStatement': CashFetcher,
         'YfinanceOptionsChains': ChainsFetcher,
+        'YfinanceOptionsChainsLong': LongChainsFetcher,
         **RESOURCE_FETCHERS,
     },
 )

@@ -29,3 +29,14 @@ async def expirations(
 ) -> OBBject:
     """Get YfinanceExpirations data from the public yfinance API."""
     return await OBBject.from_query(Query(**locals()))
+
+
+@router.command(model="YfinanceOptionsChainsLong")
+async def chains_long(
+    cc: CommandContext,
+    provider_choices: ProviderChoices,
+    standard_params: StandardParams,
+    extra_params: ExtraParams,
+) -> OBBject:
+    """Get every expiration of a symbol's option chain, one raw row per contract."""
+    return await OBBject.from_query(Query(**locals()))

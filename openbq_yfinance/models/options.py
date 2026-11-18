@@ -2,9 +2,11 @@
 """Typed listed option chains from the public Ticker.option_chain method."""
 from datetime import date, datetime
 from typing import Literal
+from zoneinfo import ZoneInfo
 from openbb_core.provider.abstract.data import Data
 from openbb_core.provider.abstract.fetcher import Fetcher
 from openbb_core.provider.utils.errors import EmptyDataError
+from pydantic import Field
 from openbq_yfinance.client import call, ticker
 from openbq_yfinance.models.common import SymbolQuery
 from openbq_yfinance.records import records
@@ -63,6 +65,54 @@ class ChainsFetcher(Fetcher[ChainsQuery, list[OptionData]]):
                 percent = item.pop('percent_change', None)
                 item['change_percent'] = percent / 100 if percent is not None else None
                 rows.append(OptionData(**item, symbol=query.symbol, expiration=data['expiration'], option_type=kind))
+        if not rows:
+            raise EmptyDataError('Yahoo Finance returned no option contracts.')
+        return rows
+
+
+class LongChainsData(OptionData):
+    """One raw contract of the whole chain; `symbol` repeats `underlying_symbol`."""
+    underlying_symbol: str = Field(description='The underlying Yahoo symbol.')
+    eod_date: date | None = Field(default=None, description="Date of the underlying's last regular-session trade, in the exchange's time zone.")
+    underlying_price: float | None = Field(default=None, description="The underlying's last regular-session price, one value for the whole response.")
+    dte: int | None = Field(default=None, description='Calendar days from eod_date to expiration.')
+    implied_volatility: float | None = Field(default=None, description='Annualized implied volatility as Yahoo reports it, a decimal fraction: 0.25 means 25%.')
+
+
+class LongChainsFetcher(Fetcher[SymbolQuery, list[LongChainsData]]):
+    """Every expiration in one response: one Yahoo request per expiration, in sequence."""
+    require_credentials = False
+
+    @staticmethod
+    def transform_query(params):
+        return SymbolQuery(**params)
+
+    @staticmethod
+    async def aextract_data(query, credentials, **kwargs):
+        def load():
+            asset = ticker(query.symbol)
+            dates = asset.options
+            if not dates:
+                raise EmptyDataError('Yahoo Finance returned no option expirations.')
+            return [(expiration, asset.option_chain(expiration)) for expiration in dates]
+        return await call(load)
+
+    @staticmethod
+    def transform_data(query, data, **kwargs):
+        # One spot for every row: each expiration's request carries its own, seconds apart.
+        quote = data[0][1].underlying or {}
+        traded = quote.get('regularMarketTime')
+        eod = datetime.fromtimestamp(traded, ZoneInfo(quote.get('exchangeTimezoneName') or 'UTC')).date() if traded else None
+        shared = {'symbol': query.symbol, 'underlying_symbol': query.symbol, 'eod_date': eod,
+                  'underlying_price': quote.get('regularMarketPrice')}
+        rows = []
+        for expiration, chain in data:
+            dte = (date.fromisoformat(expiration) - eod).days if eod else None
+            for frame, kind in [(chain.calls, 'call'), (chain.puts, 'put')]:
+                for item in records(frame):
+                    percent = item.pop('percent_change', None)
+                    item['change_percent'] = percent / 100 if percent is not None else None
+                    rows.append(LongChainsData(**item, **shared, expiration=expiration, option_type=kind, dte=dte))
         if not rows:
             raise EmptyDataError('Yahoo Finance returned no option contracts.')
         return rows
