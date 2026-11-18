@@ -94,25 +94,28 @@ class LongChainsFetcher(Fetcher[SymbolQuery, list[LongChainsData]]):
             dates = asset.options
             if not dates:
                 raise EmptyDataError('Yahoo Finance returned no option expirations.')
-            return [(expiration, asset.option_chain(expiration)) for expiration in dates]
+            chains = [(expiration, asset.option_chain(expiration)) for expiration in dates]
+            # One spot for every row: each expiration's request carries its own, seconds apart.
+            quote = chains[0][1].underlying or {}
+            return {'quote': {key: quote.get(key) for key in ('regularMarketPrice', 'regularMarketTime', 'exchangeTimezoneName')},
+                    'chains': [{'expiration': expiration, 'calls': chain.calls, 'puts': chain.puts} for expiration, chain in chains]}
         return await call(load)
 
     @staticmethod
     def transform_data(query, data, **kwargs):
-        # One spot for every row: each expiration's request carries its own, seconds apart.
-        quote = data[0][1].underlying or {}
+        quote = data['quote']
         traded = quote.get('regularMarketTime')
         eod = datetime.fromtimestamp(traded, ZoneInfo(quote.get('exchangeTimezoneName') or 'UTC')).date() if traded else None
         shared = {'symbol': query.symbol, 'underlying_symbol': query.symbol, 'eod_date': eod,
                   'underlying_price': quote.get('regularMarketPrice')}
         rows = []
-        for expiration, chain in data:
-            dte = (date.fromisoformat(expiration) - eod).days if eod else None
-            for frame, kind in [(chain.calls, 'call'), (chain.puts, 'put')]:
-                for item in records(frame):
+        for chain in data['chains']:
+            dte = (date.fromisoformat(chain['expiration']) - eod).days if eod else None
+            for key, kind in [('calls', 'call'), ('puts', 'put')]:
+                for item in records(chain[key]):
                     percent = item.pop('percent_change', None)
                     item['change_percent'] = percent / 100 if percent is not None else None
-                    rows.append(LongChainsData(**item, **shared, expiration=expiration, option_type=kind, dte=dte))
+                    rows.append(LongChainsData(**item, **shared, expiration=chain['expiration'], option_type=kind, dte=dte))
         if not rows:
             raise EmptyDataError('Yahoo Finance returned no option contracts.')
         return rows
