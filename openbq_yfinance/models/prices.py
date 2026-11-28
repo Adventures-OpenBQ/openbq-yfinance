@@ -68,6 +68,9 @@ class HistoricalFetcher(Fetcher[HistoricalQuery, list[HistoricalData]]):
         for symbol, frame in data.items():
             for stamp, item in frame.iterrows():
                 row = {k: clean(item.get(v)) for k, v in {'open':'Open','high':'High','low':'Low','close':'Close','volume':'Volume','adjusted_close':'Adj Close'}.items()}
+                # Yahoo sometimes appends a current-day row without prices.
+                if row['close'] is None:
+                    continue
                 # Daily-and-up bars are exchange-local midnight; send the calendar date so no client shifts the day.
                 row.update(symbol=symbol, date=stamp.date() if query.interval in ('1d','5d','1wk','1mo','3mo') else stamp.to_pydatetime())
                 rows.append(HistoricalData(**row))
